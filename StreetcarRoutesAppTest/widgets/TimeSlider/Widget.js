@@ -14,7 +14,105 @@
 // limitations under the License.
 ///////////////////////////////////////////////////////////////////////////
 
+define(['dojo/_base/declare',
+    'dojo/_base/lang',
+    'dojo/_base/html',
+    'dojo/_base/array',
+    'dojo/_base/config',
+    'dojo/_base/fx',
+    'dojo/on',
+    'dojo/sniff',
+    'dojo/Deferred',
+    'dojo/when',
+    'dojo/promise/all',22
+    'dojo/date/locale',
+    'dojo/i18n',
+    'jimu/LayerInfos/LayerInfos',
+    'jimu/BaseWidget',
+    'esri/lang',
+    'esri/request',
+    'esri/TimeExtent',
+    'esri/dijit/TimeSlider'
+  ],
+  function(declare, lang, html, array, dojoConfig, baseFx,
+    on, has, Deferred, when, all, dateLocale, i18n,
+    LayerInfos, BaseWidget, esriLang, esriRequest, TimeExtent, TimeSlider) {
+    // box of speed-menu
+    var menuBox = {
+      w: 105,
+      h: 123
+    };
 
+    var localeDic = {
+      'ar': {
+        datePattern: "dd MMMM, yyyy", // e.g. for German: "d. MMMM yyyy"
+        yearPattern: "yyyy",
+        hourTimePattern: "h a", // e.g. for German: "H"
+        minuteTimePattern: "h:mm a", // e.g. for German: "H:mm"
+        secondTimePattern: "h:mm:ss a", // e.g. for German: "H:mm:ss"
+        millisecondTimePattern: "h:mm:ss:SSS a" // e.g. for German: "H:mm:ss:SSS"
+      },
+      'cs': {
+        datePattern: "MMMM d, yyyy",
+        yearPattern: "yyyy",
+        hourTimePattern: "H",
+        minuteTimePattern: "h:mm",
+        secondTimePattern: "H:mm:ss",
+        millisecondTimePattern: "H:mm:ss:SSS"
+      },
+      'da': {
+        datePattern: "d. MMMM yyyy",
+        yearPattern: "yyyy",
+        hourTimePattern: "H",
+        minuteTimePattern: "H:mm",
+        secondTimePattern: "H:mm:ss",
+        millisecondTimePattern: "H:mm:ss:SSS"
+      },
+      'de': {
+        datePattern: "d. MMMM yyyy",
+        yearPattern: "yyyy",
+        hourTimePattern: "H",
+        minuteTimePattern: "H:mm",
+        secondTimePattern: "H:mm:ss",
+        millisecondTimePattern: "H:mm:ss:SSS"
+      },
+      'el': {
+        datePattern: "d MMMM yyyy",
+        yearPattern: "yyyy",
+        hourTimePattern: "h",
+        minuteTimePattern: "hh:mm",
+        secondTimePattern: "hh:mm:ss",
+        millisecondTimePattern: "hh:mm:ss:SSS"
+      },
+      'es': {
+        datePattern: "d\' de \'MMMM\' de \'yyyy",
+        yearPattern: "yyyy",
+        hourTimePattern: "H",
+        minuteTimePattern: "H:mm",
+        secondTimePattern: "H:mm:ss",
+        millisecondTimePattern: "H:mm:ss:SSS"
+      },
+      'et': {
+        datePattern: "d. MMMM yyyy",
+        yearPattern: "yyyy",
+        hourTimePattern: "H",
+        minuteTimePattern: "H:mm",
+        secondTimePattern: "H:mm:ss",
+        millisecondTimePattern: "H:mm:ss:SSS"
+      },
+      'fi': {
+        datePattern: "d. MMMM yyyy",
+        yearPattern: "yyyy",
+        hourTimePattern: "t",
+        minuteTimePattern: "t:mm a",
+        secondTimePattern: "t:mm:ss",
+        millisecondTimePattern: "h:mm:ss:SSS"
+      },
+      'fr': {
+        datePattern: "d MMMM yyyy",
+        yearPattern: "yyyy",
+        hourTimePattern: "HH",
+        minuteTimePattern: "HH:mm",
         secondTimePattern: "HH:mm:ss",
         millisecondTimePattern: "HH:mm:ss:SSS"
       },
@@ -366,7 +464,135 @@
 
         if (timeTemporalLayerChanged) {
           this._onTimeTemportalLayerChanged();
-       is.timeContentNode, 'mobile');
+        }
+      },
+
+      _onLayerInfosChanged: function(layerInfo, changedType, layerInfoSelf) {
+        /* jshint unused:true */
+        if (changedType === 'added') {
+          var _layer = this.map.getLayer(layerInfoSelf.id);
+          var visibleTimeTemporalLayerChanged = this._isTimeTemporalLayer(_layer, true);
+
+          if (visibleTimeTemporalLayerChanged) {
+            this._onTimeTemportalLayerChanged();
+          }
+        } else if (changedType === 'removed') {
+          this._onTimeTemportalLayerChanged();
+        }
+      },
+
+      _onTimeTemportalLayerChanged: function() {
+        if (this.state !== 'closed') {
+          if (this.hasVisibleTemporalLayer()) {
+            if (this.timeSlider) {
+              this.updateLayerLabel();
+            } else {
+              this.showTimeSlider();
+            }
+          } else {
+            if (this.timeSlider) {
+              this.closeTimeSlider();
+            }
+          }
+        }
+      },
+
+      onOpen: function() {
+        this._initLayerInfosObj().then(lang.hitch(this, function() {
+          if (!this.hasVisibleTemporalLayer()) {
+            html.setStyle(this.noTimeContentNode, 'display', 'block');
+            html.setStyle(this.timeContentNode, 'display', 'none');
+            this._showed = true;
+          } else {
+            if (!this._showed) {
+              this.showTimeSlider();
+            }
+          }
+        }));
+      },
+
+      onClose: function() {
+        this._initLayerInfosObj().then(lang.hitch(this, function() {
+          if (!this.hasVisibleTemporalLayer()) {
+            html.setStyle(this.noTimeContentNode, 'display', 'none');
+            this._showed = false;
+          } else {
+            if (this._showed) {
+              this.closeTimeSlider();
+            }
+          }
+        }));
+      },
+
+      _isRunInMobile: function() {
+        return window.appInfo.isRunInMobile;
+      },
+
+      showTimeSlider: function() {
+        html.setStyle(this.noTimeContentNode, 'display', 'none');
+        this.createTimeSlider().then(lang.hitch(this, function() {
+          html.setStyle(this.timeContentNode, 'display', 'block');
+          html.addClass(this.domNode, 'show-time-slider');
+
+          this._adaptResponsive();
+
+          if (has('ie') && has('ie') < 9) {
+            this._showed = true;
+          } else {
+            baseFx.animateProperty({
+              node: this.timeContentNode,
+              properties: {
+                opacity: {
+                  start: 0,
+                  end: 1
+                }
+              },
+              onEnd: lang.hitch(this, function() {
+                this._showed = true;
+                this._setMenuPosition();
+              }),
+              duration: 500
+            }).play();
+          }
+        }));
+      },
+
+      closeTimeSlider: function() {
+        html.setStyle(this.domNode, 'display', 'block');
+        if (has('ie') && has('ie') < 9) {
+          this._onCloseTimeSliderEnd();
+        } else {
+          baseFx.animateProperty({
+            node: this.timeContentNode,
+            properties: {
+              opacity: {
+                start: 1,
+                end: 0
+              }
+            },
+            onEnd: lang.hitch(this, this._onCloseTimeSliderEnd),
+            duration: 500
+          }).play();
+        }
+      },
+
+      _onCloseTimeSliderEnd: function() {
+        if (this._destroyed) {
+          return;
+        }
+        this.removeTimeSlider();
+        this._showed = false;
+
+        html.setStyle(this.timeContentNode, 'display', 'none');
+        html.removeClass(this.domNode, 'show-time-slider');
+
+        if (this.state !== 'closed') {
+          html.setStyle(this.noTimeContentNode, 'display', 'block');
+        }
+
+        if (this.state === 'closed') {
+          html.removeClass(this.domNode, 'mobile-time-slider');
+          html.removeClass(this.timeContentNode, 'mobile');
         }
       },
 
@@ -512,12 +738,18 @@
           if (this.timeSlider.timeStops.length > 25) {
             this.timeSlider.setTickCount(0);
           }
-          if (this.timeSlider.thumbCount === 1) {
-            this.timeSlider.setThumbIndexes([0]);
+          if (this.timeSlider.thumbCount === 2) {
+            this.timeSlider.setThumbIndexes([0, 1]);
           }
+		  else //
+		  {
+			  
+		  }
 
           this.timeSlider.setLoop(true);
           this.timeSlider.startup();
+		  
+		  
           html.addClass(this.timeSlider.domNode, 'jimu-float-leading');
 
           this.updateLayerLabel();
@@ -663,11 +895,11 @@
         var end = null;
 
         if (!timeExtent) {
-          if (this.timeSlider.thumbCount === 1) {
+          if (this.timeSlider.thumbCount === 2) {
             start = this.timeSlider.timeStops[0];
             end = this.timeSlider.timeStops[1];
           } else {
-            start = this.timeSlider.timeStops[1];
+            start = this.timeSlider.timeStops[0];
           }
         } else {
           start = timeExtent.startTime;
