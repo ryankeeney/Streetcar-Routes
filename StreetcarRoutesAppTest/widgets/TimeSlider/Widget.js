@@ -738,8 +738,8 @@ define(['dojo/_base/declare',
           if (this.timeSlider.timeStops.length > 25) {
             this.timeSlider.setTickCount(0);
           }
-          if (this.timeSlider.thumbCount === 2) {
-            this.timeSlider.setThumbIndexes([0, 1]);
+          if (this.timeSlider.thumbCount === 1) {
+            this.timeSlider.setThumbIndexes([0]);
           }
 
           this.timeSlider.setLoop(true);
