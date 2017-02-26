@@ -889,11 +889,11 @@ define(['dojo/_base/declare',
         var end = null;
 
         if (!timeExtent) {
-          if (this.timeSlider.thumbCount === 2) {
+          if (this.timeSlider.thumbCount === 1) {
             start = this.timeSlider.timeStops[0];
             end = this.timeSlider.timeStops[1];
           } else {
-            start = this.timeSlider.timeStops[0];
+            start = this.timeSlider.timeStops[1];
           }
         } else {
           start = timeExtent.startTime;
