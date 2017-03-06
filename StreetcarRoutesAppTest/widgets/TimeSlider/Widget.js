@@ -1001,9 +1001,8 @@ define(['dojo/_base/declare',
         } else {
           label = startTime + "";
         }
-		alert(label);
 		
-        this.timeExtentLabelNode.innerHTML = label;
+        this.timeExtentLabelNode.innerHTML = label.split(',')[1];
         html.setAttr(this.timeExtentLabelNode, 'title', label);
       },
 
