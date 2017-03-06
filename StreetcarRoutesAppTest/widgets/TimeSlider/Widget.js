@@ -751,7 +751,7 @@ define(['dojo/_base/declare',
           html.addClass(this.timeSlider.domNode, 'jimu-float-leading');
 
           this.updateLayerLabel();
-          this.updateTimeExtentLabel('yyyy');
+          this.updateTimeExtentLabel();
 
           this._timeHandles.push(on(
             this.timeSlider,
